@@ -110,15 +110,11 @@ For private repos, create a [classic GitHub PAT](https://github.com/settings/tok
 workspace_repo_token = "ghp_..."
 ```
 
-The repo is cloned and the workspace contents are copied into `/opt/openclaw/workspace` on each instance at boot. Runtime changes (like `memory/` files) stay local to each instance.
+The repo is cloned and the workspace contents are copied into `~/.openclaw/workspace` inside the container on each boot. Runtime changes (like `memory/` files) stay local to each instance.
 
 ### Secrets
 
-All API keys and secrets are handled via [OpenClaw SecretRefs](https://docs.openclaw.ai/gateway/secrets) — the config file contains no plaintext secrets. Instead:
-
-1. Terraform writes all `secrets` entries plus the per-instance `telegram_bot_token` to a `.env` file on the instance (mode 600)
-2. Docker Compose loads it via `env_file`
-3. The OpenClaw config references each key as `{ source: "env", provider: "default", id: "KEY_NAME" }`
+API keys are passed as environment variables via Docker Compose's `env_file`. Terraform writes all `secrets` entries plus the per-instance `telegram_bot_token` to a `.env` file on each instance (mode 600). OpenClaw reads them as process environment variables.
 
 Add any keys your agents need to the `secrets` map in `terraform.tfvars`:
 
