@@ -3,6 +3,8 @@ services:
     image: ${openclaw_image}
     container_name: openclaw
     restart: unless-stopped
+    env_file:
+      - .env
     volumes:
       - /opt/openclaw/config/openclaw.json5:/home/node/.openclaw/openclaw.json5:ro
       - /opt/openclaw/workspace:/home/node/workspace

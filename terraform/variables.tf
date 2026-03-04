@@ -31,9 +31,9 @@ variable "instances" {
   }
 }
 
-variable "anthropic_api_key" {
-  description = "Anthropic API key shared by all instances"
-  type        = string
+variable "secrets" {
+  description = "Environment variables passed to all instances (API keys, etc.). Keys must be uppercase with underscores."
+  type        = map(string)
   sensitive   = true
 }
 
@@ -52,7 +52,7 @@ variable "instance_type" {
 variable "root_volume_size" {
   description = "Root EBS volume size in GB"
   type        = number
-  default     = 20
+  default     = 30
 }
 
 variable "ssh_allowed_cidrs" {

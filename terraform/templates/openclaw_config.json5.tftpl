@@ -9,15 +9,22 @@
   channels: {
     telegram: {
       enabled: true,
-      botToken: "${telegram_bot_token}",
+      botToken: { source: "env", provider: "default", id: "TELEGRAM_BOT_TOKEN" },
       dmPolicy: "${telegram_dm_policy}",
 %{ if length(telegram_allow_from) > 0 ~}
       allowFrom: ${jsonencode(telegram_allow_from)},
 %{ endif ~}
     }
   },
+  secrets: {
+    providers: {
+      default: { source: "env" }
+    }
+  },
   env: {
-    ANTHROPIC_API_KEY: "${anthropic_api_key}"
+%{ for key in secret_keys ~}
+    ${key}: { source: "env", provider: "default", id: "${key}" },
+%{ endfor ~}
   },
   gateway: {
     port: 18789,

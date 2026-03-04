@@ -12,7 +12,15 @@ instances = {
   }
 }
 
-anthropic_api_key = "sk-ant-your-key-here"
+# API keys and secrets (passed as env vars to all instances)
+secrets = {
+  ANTHROPIC_API_KEY    = "sk-ant-..."
+  OPENAI_API_KEY       = "sk-..."
+  OPENAI_SKILL_API_KEY = "sk-..."
+  BRAVE_API_KEY        = "..."
+  GOOGLE_API_KEY       = "..."
+  NOTION_API_KEY       = "ntn_..."
+}
 
 # Optional: clone a git repo as the agent workspace
 # workspace_repo       = "https://github.com/your-org/your-workspace"

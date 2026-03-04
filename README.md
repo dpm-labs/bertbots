@@ -50,7 +50,18 @@ instances = {
   }
 }
 
-anthropic_api_key = "sk-ant-..."
+secrets = {
+  ANTHROPIC_API_KEY    = "sk-ant-..."
+  OPENAI_API_KEY       = "sk-..."
+  OPENAI_SKILL_API_KEY = "sk-..."
+  BRAVE_API_KEY        = "..."
+  GOOGLE_API_KEY       = "..."
+  NOTION_API_KEY       = "ntn_..."
+}
+
+# Agent workspace (optional — clone a shared workspace repo on boot)
+workspace_repo       = "https://github.com/your-org/your-workspace"
+workspace_repo_token = "ghp_..."  # required for private repos
 ```
 
 ### Instance Options
@@ -66,14 +77,55 @@ anthropic_api_key = "sk-ant-..."
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `aws_region` | `us-east-1` | AWS region |
-| `anthropic_api_key` | — | Shared Anthropic API key |
+| `secrets` | — | Map of API keys / env vars shared by all instances |
 | `default_model` | `anthropic/claude-sonnet-4-5` | Default model for all bots |
 | `instance_type` | `t3.small` | EC2 instance type |
 | `root_volume_size` | `20` | Root EBS volume size (GB) |
 | `openclaw_image` | `ghcr.io/openclaw/openclaw:latest` | Docker image |
+| `workspace_repo` | `""` | Git repo URL to clone as agent workspace |
+| `workspace_repo_token` | `""` | GitHub PAT for private workspace repos |
 | `log_retention_days` | `14` | CloudWatch log retention |
 | `ssh_public_key` | `""` | SSH public key (enables SSH access) |
 | `ssh_allowed_cidrs` | `[]` | CIDRs allowed to SSH in |
+
+### Agent Workspace
+
+You can pre-load each instance with a shared [agent workspace](https://docs.openclaw.ai/concepts/agent-workspace) (AGENTS.md, SOUL.md, tools, etc.) by pointing to a git repo:
+
+```hcl
+workspace_repo = "https://github.com/your-org/your-workspace"
+```
+
+For private repos, create a [fine-grained GitHub PAT](https://github.com/settings/personal-access-tokens) with read-only Contents access and add:
+
+```hcl
+workspace_repo_token = "ghp_..."
+```
+
+The repo is cloned into `/opt/openclaw/workspace` on each instance at boot. Runtime changes (like `memory/` files) stay local to each instance.
+
+### Secrets
+
+All API keys and secrets are handled via [OpenClaw SecretRefs](https://docs.openclaw.ai/gateway/secrets) — the config file contains no plaintext secrets. Instead:
+
+1. Terraform writes all `secrets` entries plus the per-instance `telegram_bot_token` to a `.env` file on the instance (mode 600)
+2. Docker Compose loads it via `env_file`
+3. The OpenClaw config references each key as `{ source: "env", provider: "default", id: "KEY_NAME" }`
+
+Add any keys your agents need to the `secrets` map in `terraform.tfvars`:
+
+```hcl
+secrets = {
+  ANTHROPIC_API_KEY    = "sk-ant-..."
+  OPENAI_API_KEY       = "sk-..."
+  OPENAI_SKILL_API_KEY = "sk-..."
+  BRAVE_API_KEY        = "..."
+  GOOGLE_API_KEY       = "..."
+  NOTION_API_KEY       = "ntn_..."
+}
+```
+
+The `telegram_bot_token` from each instance entry is automatically included as `TELEGRAM_BOT_TOKEN`. You don't need `OPENCLAW_GATEWAY_TOKEN` — these bots use Telegram long-polling with no inbound gateway access.
 
 ### Enabling SSH Access
 

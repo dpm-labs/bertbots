@@ -26,6 +26,12 @@ cat > /opt/openclaw/compose/docker-compose.yml << 'COMPOSE_FILE'
 ${docker_compose}
 COMPOSE_FILE
 
+echo "=== Writing secrets env file ==="
+cat > /opt/openclaw/compose/.env << 'ENV_FILE'
+${env_file}
+ENV_FILE
+chmod 600 /opt/openclaw/compose/.env
+
 %{ if workspace_repo != "" ~}
 echo "=== Cloning workspace repo ==="
 dnf install -y git
