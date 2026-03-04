@@ -26,6 +26,16 @@ cat > /opt/openclaw/compose/docker-compose.yml << 'COMPOSE_FILE'
 ${docker_compose}
 COMPOSE_FILE
 
+%{ if workspace_repo != "" ~}
+echo "=== Cloning workspace repo ==="
+dnf install -y git
+%{ if workspace_repo_token != "" ~}
+git clone https://${workspace_repo_token}@${replace(workspace_repo, "https://", "")} /opt/openclaw/workspace
+%{ else ~}
+git clone ${workspace_repo} /opt/openclaw/workspace
+%{ endif ~}
+%{ endif ~}
+
 echo "=== Setting ownership ==="
 chown -R 1000:1000 /opt/openclaw/config /opt/openclaw/workspace
 

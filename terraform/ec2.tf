@@ -49,6 +49,8 @@ resource "aws_instance" "openclaw" {
       anthropic_api_key   = var.anthropic_api_key
       model               = var.default_model
     })
+    workspace_repo       = var.workspace_repo
+    workspace_repo_token = var.workspace_repo_token
     docker_compose = templatefile("${path.module}/templates/docker-compose.yml.tftpl", {
       openclaw_image = var.openclaw_image
       aws_region     = var.aws_region

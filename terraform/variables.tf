@@ -73,6 +73,19 @@ variable "openclaw_image" {
   default     = "ghcr.io/openclaw/openclaw:latest"
 }
 
+variable "workspace_repo" {
+  description = "Git repository URL to clone as the OpenClaw workspace. Leave empty for a blank workspace."
+  type        = string
+  default     = ""
+}
+
+variable "workspace_repo_token" {
+  description = "GitHub personal access token for cloning a private workspace repo"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "log_retention_days" {
   description = "CloudWatch log retention in days"
   type        = number
