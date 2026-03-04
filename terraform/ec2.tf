@@ -45,13 +45,13 @@ resource "aws_instance" "openclaw" {
     openclaw_config = templatefile("${path.module}/templates/openclaw_config.json5.tftpl", {
       telegram_dm_policy  = each.value.telegram_dm_policy
       telegram_allow_from = each.value.telegram_allow_from
-      secret_keys         = keys(merge(var.secrets, { TELEGRAM_BOT_TOKEN = "" }))
       model               = var.default_model
     })
     env_file = join("\n", [for k, v in merge(var.secrets, {
       TELEGRAM_BOT_TOKEN = each.value.telegram_bot_token
     }) : "${k}=${v}"])
     workspace_repo       = var.workspace_repo
+    workspace_repo_path  = var.workspace_repo_path
     workspace_repo_token = var.workspace_repo_token
     docker_compose = templatefile("${path.module}/templates/docker-compose.yml.tftpl", {
       openclaw_image = var.openclaw_image

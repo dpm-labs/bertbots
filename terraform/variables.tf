@@ -79,6 +79,12 @@ variable "workspace_repo" {
   default     = ""
 }
 
+variable "workspace_repo_path" {
+  description = "Subdirectory within the repo to use as workspace. Leave empty to use the repo root."
+  type        = string
+  default     = ""
+}
+
 variable "workspace_repo_token" {
   description = "GitHub personal access token for cloning a private workspace repo"
   type        = string

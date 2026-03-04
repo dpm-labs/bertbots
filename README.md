@@ -61,7 +61,8 @@ secrets = {
 
 # Agent workspace (optional — clone a shared workspace repo on boot)
 workspace_repo       = "https://github.com/your-org/your-workspace"
-workspace_repo_token = "ghp_..."  # required for private repos
+workspace_repo_path  = "workspace"  # subdirectory within repo (optional)
+workspace_repo_token = "ghp_..."    # required for private repos
 ```
 
 ### Instance Options
@@ -83,6 +84,7 @@ workspace_repo_token = "ghp_..."  # required for private repos
 | `root_volume_size` | `20` | Root EBS volume size (GB) |
 | `openclaw_image` | `ghcr.io/openclaw/openclaw:latest` | Docker image |
 | `workspace_repo` | `""` | Git repo URL to clone as agent workspace |
+| `workspace_repo_path` | `""` | Subdirectory within repo to use as workspace |
 | `workspace_repo_token` | `""` | GitHub PAT for private workspace repos |
 | `log_retention_days` | `14` | CloudWatch log retention |
 | `ssh_public_key` | `""` | SSH public key (enables SSH access) |
@@ -96,13 +98,19 @@ You can pre-load each instance with a shared [agent workspace](https://docs.open
 workspace_repo = "https://github.com/your-org/your-workspace"
 ```
 
-For private repos, create a [fine-grained GitHub PAT](https://github.com/settings/personal-access-tokens) with read-only Contents access and add:
+If the workspace files live in a subdirectory of the repo, specify the path:
+
+```hcl
+workspace_repo_path = "workspace"
+```
+
+For private repos, create a [classic GitHub PAT](https://github.com/settings/tokens/new) with `repo` scope and add:
 
 ```hcl
 workspace_repo_token = "ghp_..."
 ```
 
-The repo is cloned into `/opt/openclaw/workspace` on each instance at boot. Runtime changes (like `memory/` files) stay local to each instance.
+The repo is cloned and the workspace contents are copied into `/opt/openclaw/workspace` on each instance at boot. Runtime changes (like `memory/` files) stay local to each instance.
 
 ### Secrets
 

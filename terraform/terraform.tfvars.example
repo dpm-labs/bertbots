@@ -24,6 +24,7 @@ secrets = {
 
 # Optional: clone a git repo as the agent workspace
 # workspace_repo       = "https://github.com/your-org/your-workspace"
+# workspace_repo_path  = "workspace"            # subdirectory within repo (optional)
 # workspace_repo_token = "ghp_your-token-here"  # required for private repos
 
 # Optional: SSH access

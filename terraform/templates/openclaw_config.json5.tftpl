@@ -1,8 +1,8 @@
 {
   agents: {
     defaults: {
-      models: {
-        default: "${model}"
+      model: {
+        primary: "${model}"
       }
     }
   },
@@ -20,11 +20,6 @@
     providers: {
       default: { source: "env" }
     }
-  },
-  env: {
-%{ for key in secret_keys ~}
-    ${key}: { source: "env", provider: "default", id: "${key}" },
-%{ endfor ~}
   },
   gateway: {
     port: 18789,
