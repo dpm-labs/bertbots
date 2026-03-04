@@ -1,0 +1,19 @@
+aws_region = "us-east-1"
+
+instances = {
+  "bot-alpha" = {
+    telegram_bot_token = "123456:ABC-YOUR-TOKEN-HERE"
+    telegram_dm_policy = "pairing"
+  }
+  "bot-beta" = {
+    telegram_bot_token = "789012:DEF-YOUR-TOKEN-HERE"
+    telegram_dm_policy = "allowlist"
+    telegram_allow_from = ["12345678"]
+  }
+}
+
+anthropic_api_key = "sk-ant-your-key-here"
+
+# Optional: SSH access
+# ssh_public_key    = "ssh-ed25519 AAAA..."
+# ssh_allowed_cidrs = ["1.2.3.4/32"]

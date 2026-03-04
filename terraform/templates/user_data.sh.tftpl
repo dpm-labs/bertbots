@@ -1,0 +1,73 @@
+#!/bin/bash
+set -euo pipefail
+exec > >(tee /var/log/user-data.log) 2>&1
+
+echo "=== Installing Docker ==="
+dnf install -y docker
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+echo "=== Installing Docker Compose plugin ==="
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+echo "=== Creating directories ==="
+mkdir -p /opt/openclaw/{config,workspace,compose}
+
+echo "=== Writing OpenClaw config ==="
+cat > /opt/openclaw/config/openclaw.json5 << 'OPENCLAW_CONFIG'
+${openclaw_config}
+OPENCLAW_CONFIG
+
+echo "=== Writing Docker Compose file ==="
+cat > /opt/openclaw/compose/docker-compose.yml << 'COMPOSE_FILE'
+${docker_compose}
+COMPOSE_FILE
+
+echo "=== Setting ownership ==="
+chown -R 1000:1000 /opt/openclaw/config /opt/openclaw/workspace
+
+echo "=== Pulling and starting OpenClaw ==="
+docker compose -f /opt/openclaw/compose/docker-compose.yml pull
+docker compose -f /opt/openclaw/compose/docker-compose.yml up -d
+
+echo "=== Waiting for health check ==="
+for i in $(seq 1 30); do
+  if curl -sf http://127.0.0.1:18789/healthz > /dev/null 2>&1; then
+    echo "OpenClaw is healthy"
+    break
+  fi
+  echo "Waiting for OpenClaw... ($i/30)"
+  sleep 5
+done
+
+if ! curl -sf http://127.0.0.1:18789/healthz > /dev/null 2>&1; then
+  echo "FATAL: OpenClaw failed health check after 150 seconds"
+  exit 1
+fi
+
+echo "=== Creating systemd service ==="
+cat > /etc/systemd/system/openclaw.service << 'SYSTEMD_UNIT'
+[Unit]
+Description=OpenClaw Docker Compose
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/openclaw/compose
+ExecStart=/usr/bin/docker compose -f /opt/openclaw/compose/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f /opt/openclaw/compose/docker-compose.yml down
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target
+SYSTEMD_UNIT
+
+systemctl daemon-reload
+systemctl enable openclaw.service
+
+echo "=== Bootstrap complete ==="

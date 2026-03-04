@@ -1,0 +1,26 @@
+{
+  agents: {
+    defaults: {
+      models: {
+        default: "${model}"
+      }
+    }
+  },
+  channels: {
+    telegram: {
+      enabled: true,
+      botToken: "${telegram_bot_token}",
+      dmPolicy: "${telegram_dm_policy}",
+%{ if length(telegram_allow_from) > 0 ~}
+      allowFrom: ${jsonencode(telegram_allow_from)},
+%{ endif ~}
+    }
+  },
+  env: {
+    ANTHROPIC_API_KEY: "${anthropic_api_key}"
+  },
+  gateway: {
+    port: 18789,
+    bind: "lan"
+  }
+}
