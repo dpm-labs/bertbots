@@ -1,6 +1,6 @@
 # BertBots — OpenClaw Fleet on AWS
 
-Terraform project that deploys 2-10 [OpenClaw](https://github.com/openclaw/openclaw) instances on AWS, each running its own Telegram bot. All instances share a single Anthropic API key.
+Terraform project that deploys 2-10 [OpenClaw](https://github.com/openclaw/openclaw) instances on AWS, each running its own Telegram bot. All instances share API keys and a common agent configuration with multi-model support (Anthropic, OpenAI, xAI), skills (Notion, image gen, whisper), and Brave web search.
 
 Each bot runs on a dedicated `t3.small` EC2 instance (~$15/mo) with Docker Compose, CloudWatch logging, and SSM access.
 
@@ -79,9 +79,9 @@ workspace_repo_token = "ghp_..."    # required for private repos
 |----------|---------|-------------|
 | `aws_region` | `us-east-1` | AWS region |
 | `secrets` | — | Map of API keys / env vars shared by all instances |
-| `default_model` | `anthropic/claude-sonnet-4-5` | Default model for all bots |
+| `default_model` | `anthropic/claude-sonnet-4-6` | Primary model for all bots |
 | `instance_type` | `t3.small` | EC2 instance type |
-| `root_volume_size` | `20` | Root EBS volume size (GB) |
+| `root_volume_size` | `30` | Root EBS volume size (GB) |
 | `openclaw_image` | `ghcr.io/openclaw/openclaw:latest` | Docker image |
 | `workspace_repo` | `""` | Git repo URL to clone as agent workspace |
 | `workspace_repo_path` | `""` | Subdirectory within repo to use as workspace |
@@ -190,7 +190,7 @@ From inside an instance:
 ```bash
 curl http://127.0.0.1:18789/healthz
 docker compose -f /opt/openclaw/compose/docker-compose.yml ps
-cat /opt/openclaw/config/openclaw.json5
+sudo docker exec openclaw cat /home/node/.openclaw/openclaw.json
 ```
 
 ### View bootstrap logs
@@ -239,7 +239,7 @@ cat /var/log/user-data.log
 | Resource | Estimate |
 |----------|----------|
 | EC2 t3.small per instance | ~$15/mo |
-| EBS gp3 20GB per instance | ~$1.60/mo |
+| EBS gp3 30GB per instance | ~$2.40/mo |
 | CloudWatch Logs | ~$0.50/GB ingested |
 | Data transfer (outbound) | ~$0.09/GB after 1GB free |
 

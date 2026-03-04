@@ -1,10 +1,183 @@
 {
+  models: {
+    mode: "merge",
+    providers: {
+      anthropic: {
+        baseUrl: "https://api.anthropic.com",
+        apiKey: "$${ANTHROPIC_API_KEY}",
+        api: "anthropic-messages",
+        models: [
+          {
+            id: "claude-sonnet-4-5",
+            name: "Claude Sonnet 4.5",
+            reasoning: false,
+            input: ["text", "image"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 200000,
+            maxTokens: 8192
+          },
+          {
+            id: "opus-4.6",
+            name: "Opus 4.6",
+            reasoning: false,
+            input: ["text", "image"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 200000,
+            maxTokens: 8192
+          },
+          {
+            id: "claude-haiku-4",
+            name: "Claude 4 Haiku",
+            reasoning: false,
+            input: ["text", "image"],
+            cost: { input: 0.00025, output: 0.00125, cacheRead: 0.00003, cacheWrite: 0.0003 },
+            contextWindow: 200000,
+            maxTokens: 8192
+          },
+          {
+            id: "claude-3-5-haiku-20241022",
+            name: "Claude 3.5 Haiku",
+            reasoning: false,
+            input: ["text", "image"],
+            cost: { input: 0.00025, output: 0.00125, cacheRead: 0.00003, cacheWrite: 0.0003 },
+            contextWindow: 200000,
+            maxTokens: 8192
+          },
+          {
+            id: "claude-sonnet-4-6",
+            name: "Claude Sonnet 4.6",
+            reasoning: false,
+            input: ["text", "image"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 1000000,
+            maxTokens: 8192,
+            headers: { "anthropic-beta": "context-1m-2025-08-07" }
+          }
+        ]
+      },
+      openai: {
+        baseUrl: "https://api.openai.com/v1",
+        apiKey: "$${OPENAI_API_KEY}",
+        api: "openai-responses",
+        models: [
+          {
+            id: "gpt-4o",
+            name: "GPT-4o",
+            reasoning: false,
+            input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 200000,
+            maxTokens: 8192
+          },
+          {
+            id: "gpt-4o-mini",
+            name: "GPT-4o Mini",
+            reasoning: false,
+            input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 200000,
+            maxTokens: 8192
+          }
+        ]
+      },
+      xai: {
+        baseUrl: "https://api.x.ai/v1",
+        api: "openai-completions",
+        models: [
+          {
+            id: "grok-4",
+            name: "Grok 4",
+            reasoning: false,
+            input: ["text"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 131072,
+            maxTokens: 8192
+          }
+        ]
+      }
+    }
+  },
   agents: {
     defaults: {
       model: {
-        primary: "${model}"
+        primary: "${model}",
+        fallbacks: [
+          "google/gemini-3-pro-preview",
+          "xai/grok-4",
+          "anthropic/claude-opus-4-6",
+          "google/gemini-3-flash-preview",
+          "xai/grok-4-fast",
+          "anthropic/claude-sonnet-4-6"
+        ]
+      },
+      models: {
+        "anthropic/claude-haiku-4-5": {},
+        "anthropic/claude-opus-4-6": {},
+        "anthropic/claude-sonnet-4-5": { alias: "Sonnet" },
+        "anthropic/claude-sonnet-4-6": { alias: "Sonnet", params: { context1m: true } },
+        "anthropic/opus-4.6": { alias: "Opus" },
+        "google/gemini-2.5-flash": {},
+        "google/gemini-2.5-pro": {},
+        "google/gemini-3-flash-preview": { alias: "gemini" },
+        "google/gemini-3-pro-preview": { alias: "gemini-pro" },
+        "openai/gpt-4o": { alias: "4o" },
+        "openai/gpt-4o-mini": { alias: "4o-mini" },
+        "xai/grok-4": { alias: "Grok" },
+        "xai/grok-4-fast": {}
+      },
+      compaction: {
+        mode: "default",
+        reserveTokensFloor: 150000,
+        memoryFlush: {
+          enabled: true,
+          softThresholdTokens: 40000,
+          prompt: "Before this session compacts: write any important decisions, project state changes, lessons learned, or unresolved blockers to memory/YYYY-MM-DD.md or MEMORY.md. Reply NO_REPLY if nothing needs saving.",
+          systemPrompt: "Session is nearing compaction. Write any durable memories to disk now before context is lost."
+        }
+      },
+      thinkingDefault: "low",
+      heartbeat: { model: "google/gemini-3-flash-preview" },
+      maxConcurrent: 8,
+      subagents: {
+        maxConcurrent: 8,
+        model: "anthropic/claude-sonnet-4-6"
       }
     }
+  },
+  tools: {
+    web: {
+      search: {
+        apiKey: "$${BRAVE_API_KEY}"
+      }
+    }
+  },
+  skills: {
+    entries: {
+      "nano-banana-pro": { apiKey: "$${GOOGLE_API_KEY}" },
+      "notion": { apiKey: "$${NOTION_API_KEY}" },
+      "openai-image-gen": { apiKey: "$${OPENAI_SKILL_API_KEY}" },
+      "openai-whisper-api": { apiKey: "$${OPENAI_SKILL_API_KEY}" }
+    }
+  },
+  hooks: {
+    internal: {
+      enabled: true,
+      entries: {
+        "boot-md": { enabled: true },
+        "bootstrap-extra-files": { enabled: true },
+        "command-logger": { enabled: true },
+        "session-memory": { enabled: true }
+      }
+    }
+  },
+  messages: {
+    ackReactionScope: "group-mentions"
+  },
+  commands: {
+    native: "auto",
+    nativeSkills: "auto",
+    restart: true,
+    ownerDisplay: "raw"
   },
   channels: {
     telegram: {
@@ -14,6 +187,8 @@
 %{ if length(telegram_allow_from) > 0 ~}
       allowFrom: ${jsonencode(telegram_allow_from)},
 %{ endif ~}
+      groupPolicy: "allowlist",
+      streaming: "partial"
     }
   },
   secrets: {

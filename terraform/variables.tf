@@ -38,9 +38,9 @@ variable "secrets" {
 }
 
 variable "default_model" {
-  description = "Default Anthropic model for all instances"
+  description = "Primary model for all instances"
   type        = string
-  default     = "anthropic/claude-sonnet-4-5"
+  default     = "anthropic/claude-sonnet-4-6"
 }
 
 variable "instance_type" {
