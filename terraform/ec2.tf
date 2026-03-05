@@ -25,6 +25,24 @@ resource "aws_key_pair" "deploy" {
   public_key      = var.ssh_public_key
 }
 
+resource "aws_ebs_volume" "openclaw_data" {
+  for_each = var.instances
+
+  availability_zone = "${var.aws_region}a"
+  size              = var.data_volume_size
+  type              = "gp3"
+  encrypted         = true
+
+  tags = {
+    Name = "${var.project_name}-${each.key}-data"
+    Bot  = each.key
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
 resource "aws_instance" "openclaw" {
   for_each = var.instances
 
@@ -59,6 +77,7 @@ resource "aws_instance" "openclaw" {
       log_group      = aws_cloudwatch_log_group.openclaw.name
       instance_name  = each.key
     })
+    data_volume_id = aws_ebs_volume.openclaw_data[each.key].id
   })
 
   user_data_replace_on_change = true
@@ -72,4 +91,12 @@ resource "aws_instance" "openclaw" {
     http_tokens   = "required"
     http_endpoint = "enabled"
   }
+}
+
+resource "aws_volume_attachment" "openclaw_data" {
+  for_each = var.instances
+
+  device_name = "/dev/xvdf"
+  volume_id   = aws_ebs_volume.openclaw_data[each.key].id
+  instance_id = aws_instance.openclaw[each.key].id
 }

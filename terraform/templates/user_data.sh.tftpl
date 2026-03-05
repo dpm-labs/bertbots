@@ -13,8 +13,46 @@ curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-co
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
+echo "=== Installing nvme-cli ==="
+dnf install -y nvme-cli
+
+echo "=== Discovering data volume ==="
+DATA_VOLUME_ID="${data_volume_id}"
+# Strip the vol- prefix — NVMe serial uses the raw ID without the hyphen
+VOLUME_SERIAL="$(echo "$DATA_VOLUME_ID" | tr -d '-')"
+
+DEVICE=""
+for i in $(seq 1 60); do
+  for dev in /dev/nvme*n1; do
+    [ -b "$dev" ] || continue
+    SERIAL="$(nvme id-ctrl "$dev" -o json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('sn','').strip())" 2>/dev/null || true)"
+    if [ "$SERIAL" = "$VOLUME_SERIAL" ]; then
+      DEVICE="$dev"
+      break 2
+    fi
+  done
+  echo "Waiting for data volume $DATA_VOLUME_ID... ($i/60)"
+  sleep 2
+done
+
+if [ -z "$DEVICE" ]; then
+  echo "FATAL: Data volume $DATA_VOLUME_ID not found after 120 seconds"
+  exit 1
+fi
+echo "Found data volume at $DEVICE"
+
+echo "=== Preparing data volume ==="
+if ! blkid "$DEVICE" > /dev/null 2>&1; then
+  echo "First boot — formatting $DEVICE"
+  mkfs.ext4 -L openclaw-data "$DEVICE"
+fi
+
+mkdir -p /opt/openclaw/config
+mount "$DEVICE" /opt/openclaw/config
+echo "UUID=$(blkid -s UUID -o value "$DEVICE")  /opt/openclaw/config  ext4  defaults,nofail  0  2" >> /etc/fstab
+
 echo "=== Creating directories ==="
-mkdir -p /opt/openclaw/{config/workspace,compose}
+mkdir -p /opt/openclaw/config/workspace /opt/openclaw/compose
 
 echo "=== Writing OpenClaw config ==="
 cat > /opt/openclaw/config/openclaw.json << 'OPENCLAW_CONFIG'
@@ -33,19 +71,23 @@ ENV_FILE
 chmod 600 /opt/openclaw/compose/.env
 
 %{ if workspace_repo != "" ~}
-echo "=== Cloning workspace repo ==="
-dnf install -y git
+if [ -z "$(ls -A /opt/openclaw/config/workspace 2>/dev/null)" ]; then
+  echo "=== Cloning workspace repo (first boot) ==="
+  dnf install -y git
 %{ if workspace_repo_token != "" ~}
-git clone https://${workspace_repo_token}@${replace(workspace_repo, "https://", "")} /tmp/workspace-repo
+  git clone https://${workspace_repo_token}@${replace(workspace_repo, "https://", "")} /tmp/workspace-repo
 %{ else ~}
-git clone ${workspace_repo} /tmp/workspace-repo
+  git clone ${workspace_repo} /tmp/workspace-repo
 %{ endif ~}
 %{ if workspace_repo_path != "" ~}
-cp -a /tmp/workspace-repo/${workspace_repo_path}/. /opt/openclaw/config/workspace/
+  cp -a /tmp/workspace-repo/${workspace_repo_path}/. /opt/openclaw/config/workspace/
 %{ else ~}
-cp -a /tmp/workspace-repo/. /opt/openclaw/config/workspace/
+  cp -a /tmp/workspace-repo/. /opt/openclaw/config/workspace/
 %{ endif ~}
-rm -rf /tmp/workspace-repo
+  rm -rf /tmp/workspace-repo
+else
+  echo "=== Workspace already exists, skipping clone ==="
+fi
 %{ endif ~}
 
 echo "=== Setting ownership ==="

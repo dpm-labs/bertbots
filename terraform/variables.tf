@@ -13,8 +13,8 @@ variable "project_name" {
 variable "instances" {
   description = "Map of OpenClaw bot instances to deploy"
   type = map(object({
-    telegram_bot_token = string
-    telegram_dm_policy = optional(string, "pairing")
+    telegram_bot_token  = string
+    telegram_dm_policy  = optional(string, "pairing")
     telegram_allow_from = optional(list(string), [])
   }))
 
@@ -90,6 +90,12 @@ variable "workspace_repo_token" {
   type        = string
   sensitive   = true
   default     = ""
+}
+
+variable "data_volume_size" {
+  description = "Size of the persistent EBS data volume per instance (GB)"
+  type        = number
+  default     = 10
 }
 
 variable "log_retention_days" {

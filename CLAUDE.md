@@ -31,13 +31,15 @@ All Terraform commands must be run from the `terraform/` directory.
 
 ## Key Patterns
 
-**Instance lifecycle**: Any change to user_data triggers instance replacement (`user_data_replace_on_change = true`). This means config changes destroy and recreate instances — workspace memory is lost.
+**Instance lifecycle**: Any change to user_data triggers instance replacement (`user_data_replace_on_change = true`). Config changes destroy and recreate instances, but workspace data persists on a dedicated EBS data volume that survives redeploys.
 
 **Terraform template escaping**: The OpenClaw config uses `${VAR_NAME}` for env var interpolation at runtime. In the `.tftpl` template, these must be escaped as `$${VAR_NAME}` so Terraform outputs the literal `${VAR_NAME}`.
 
 **Config file naming**: The config is written as `openclaw.json` (not `.json5`). OpenClaw's doctor creates its own `openclaw.json` on first boot — writing to this path prevents a precedence conflict where doctor's copy overrides ours.
 
-**Workspace mount**: `/opt/openclaw/config` on the host maps to `/home/node/.openclaw` in the container. Workspace files go into `/opt/openclaw/config/workspace/` so they appear at `~/.openclaw/workspace/` inside the container.
+**Workspace mount**: `/opt/openclaw/config` on the host is a persistent EBS volume mounted at boot, which maps to `/home/node/.openclaw` in the container. Workspace files go into `/opt/openclaw/config/workspace/` so they appear at `~/.openclaw/workspace/` inside the container.
+
+**Data persistence**: Each instance has a dedicated EBS volume (`aws_ebs_volume.openclaw_data`) with `prevent_destroy`. The user_data script discovers it via NVMe serial, formats on first boot, and mounts it. Config is always overwritten; workspace is only cloned if empty. Removing a bot requires `terraform state rm` of the volume resources first.
 
 **Secrets flow**: API keys are in `terraform.tfvars` → rendered into `/opt/openclaw/compose/.env` → loaded by Docker Compose `env_file` → available as process env vars in the container. The OpenClaw config references them via `${VAR_NAME}` syntax or SecretRefs (only for `botToken`).
 
@@ -69,7 +71,16 @@ aws logs tail /bertbots/openclaw --follow --region <region>
 
 ## Adding/Removing Bots
 
-Edit `instances` map in `terraform.tfvars` and `terraform apply`. Each map key becomes an EC2 instance. The `telegram_bot_token` is per-instance; everything else (API keys, model config, workspace) is shared.
+**Adding**: Add an entry to `instances` in `terraform.tfvars` and `terraform apply`. Each map key becomes an EC2 instance with its own EBS data volume.
+
+**Removing**: Data volumes have `prevent_destroy`, so removing a bot requires removing the volume resources from state first:
+```bash
+terraform state rm 'aws_ebs_volume.openclaw_data["bot-name"]'
+terraform state rm 'aws_volume_attachment.openclaw_data["bot-name"]'
+```
+Then delete the entry from `instances` and `terraform apply`. Orphaned EBS volumes can be deleted manually in the AWS console.
+
+The `telegram_bot_token` is per-instance; everything else (API keys, model config, workspace) is shared.
 
 ## Git Conventions
 

@@ -82,6 +82,7 @@ workspace_repo_token = "ghp_..."    # required for private repos
 | `default_model` | `anthropic/claude-sonnet-4-6` | Primary model for all bots |
 | `instance_type` | `t3.small` | EC2 instance type |
 | `root_volume_size` | `30` | Root EBS volume size (GB) |
+| `data_volume_size` | `10` | Persistent data volume size per instance (GB) |
 | `openclaw_image` | `ghcr.io/openclaw/openclaw:latest` | Docker image |
 | `workspace_repo` | `""` | Git repo URL to clone as agent workspace |
 | `workspace_repo_path` | `""` | Subdirectory within repo to use as workspace |
@@ -110,7 +111,7 @@ For private repos, create a [classic GitHub PAT](https://github.com/settings/tok
 workspace_repo_token = "ghp_..."
 ```
 
-The repo is cloned and the workspace contents are copied into `~/.openclaw/workspace` inside the container on each boot. Runtime changes (like `memory/` files) stay local to each instance.
+On the first boot, the repo is cloned and workspace contents are copied into `~/.openclaw/workspace` inside the container. On subsequent deploys, the clone is skipped to preserve runtime data (memory files, agent state).
 
 ### Secrets
 
@@ -151,11 +152,17 @@ ssh_allowed_cidrs = ["1.2.3.4/32"]  # your IP
 ### Remove a bot
 
 1. Delete the entry from `instances` in `terraform/terraform.tfvars`
-2. `terraform apply`
+2. Remove the data volume from Terraform state first (it has `prevent_destroy`):
+   ```bash
+   terraform state rm 'aws_ebs_volume.openclaw_data["bot-name"]'
+   terraform state rm 'aws_volume_attachment.openclaw_data["bot-name"]'
+   ```
+3. `terraform apply`
+4. Manually delete the orphaned EBS volume in the AWS console (or keep it as a backup)
 
 ### Update configuration
 
-Edit `terraform/terraform.tfvars` and run `terraform apply` from `terraform/`. This replaces the affected instances with fresh ones running the new config.
+Edit `terraform/terraform.tfvars` and run `terraform apply` from `terraform/`. This replaces the affected instances with fresh ones running the new config. Persistent data (workspace memory, agent state) is preserved on a dedicated EBS volume that survives instance replacement.
 
 ### Connect to an instance
 
@@ -205,41 +212,59 @@ cat /var/log/user-data.log
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│ VPC 10.0.0.0/16                             │
-│  ┌────────────────────────────────────────┐  │
-│  │ Public Subnet 10.0.1.0/24             │  │
-│  │                                        │  │
-│  │  ┌──────────┐  ┌──────────┐           │  │
-│  │  │ bot-alpha│  │ bot-beta │  ...      │  │
-│  │  │ t3.small │  │ t3.small │           │  │
-│  │  │ Docker   │  │ Docker   │           │  │
-│  │  └────┬─────┘  └────┬─────┘           │  │
-│  └───────┼──────────────┼─────────────────┘  │
-│          │              │                     │
-│          ▼              ▼                     │
+┌───────────────────────────────────────────────┐
+│ VPC 10.0.0.0/16                               │
+│  ┌─────────────────────────────────────────┐  │
+│  │ Public Subnet 10.0.1.0/24               │  │
+│  │                                         │  │
+│  │  ┌───────────┐  ┌───────────┐           │  │
+│  │  │ bot-alpha │  │ bot-beta  │  ...      │  │
+│  │  │ t3.small  │  │ t3.small  │           │  │
+│  │  │ Docker    │  │ Docker    │           │  │
+│  │  └─────┬─────┘  └─────┬─────┘           │  │
+│  └────────┼───────────────┼────────────────┘  │
+│           │               │                   │
+│           ▼               ▼                   │
 │    Internet Gateway (egress only)             │
-└─────────────────────────────────────────────┘
-           │              │
-           ▼              ▼
-     Telegram API    Anthropic API
-           │
-           ▼
-     CloudWatch Logs
+└───────────────────────────────────────────────┘
+            │               │
+            ▼               ▼
+      Telegram API    Anthropic API
+            │
+            ▼
+      CloudWatch Logs
 ```
 
 - No inbound ports (Telegram uses long-polling)
 - SSH ingress only if explicitly configured
 - Each instance has an IAM role for CloudWatch Logs and SSM
-- EBS volumes are encrypted with gp3
+- EBS root volumes are encrypted with gp3
+- Persistent EBS data volume per instance (`prevent_destroy`) for workspace/memory data
 - IMDSv2 required on all instances
+
+### Data Persistence
+
+Each bot instance has a dedicated EBS data volume mounted at `/opt/openclaw/config` (which maps to `~/.openclaw` in the container). This volume persists across instance replacements:
+
+- **Config** (`openclaw.json`, Docker Compose, `.env`) is always overwritten on boot to reflect the latest Terraform state
+- **Workspace** is only cloned on first boot — subsequent deploys skip the clone, preserving memory files and agent state
+- **Volumes have `prevent_destroy`** — Terraform will refuse to delete them. See "Remove a bot" above for the cleanup workflow
+
+On Nitro instances (t3.small), the boot script discovers the volume via NVMe serial number matching and formats it with ext4 on first boot.
+
+### Security Note
+
+Secrets (API keys, bot tokens, GitHub PAT) are passed via EC2 user data, which means they are stored in plaintext in the instance metadata and visible to anyone with `ec2:DescribeInstanceAttribute` IAM access in your AWS account. This is fine for personal use but not recommended for production. A more robust approach would use AWS Secrets Manager or SSM Parameter Store and have the instance pull secrets at boot.
+
+The workspace repo token also persists in `/var/log/user-data.log` after use. If this concerns you, SSM into the instance and clear the log after bootstrap.
 
 ## Costs
 
 | Resource | Estimate |
 |----------|----------|
 | EC2 t3.small per instance | ~$15/mo |
-| EBS gp3 30GB per instance | ~$2.40/mo |
+| EBS gp3 30GB root per instance | ~$2.40/mo |
+| EBS gp3 10GB data per instance | ~$0.80/mo |
 | CloudWatch Logs | ~$0.50/GB ingested |
 | Data transfer (outbound) | ~$0.09/GB after 1GB free |
 
@@ -249,7 +274,13 @@ No load balancer, NAT gateway, or other expensive resources.
 
 ```bash
 cd terraform/
+
+# Data volumes have prevent_destroy — remove them from state first
+terraform state list | grep aws_ebs_volume.openclaw_data | xargs -I{} terraform state rm '{}'
+terraform state list | grep aws_volume_attachment.openclaw_data | xargs -I{} terraform state rm '{}'
+
+# Destroy remaining resources
 terraform destroy
 ```
 
-This removes all AWS resources created by this project.
+After destroy, manually delete the orphaned EBS data volumes in the AWS console if you no longer need them.

@@ -2,10 +2,11 @@ output "instance_details" {
   description = "Details for each OpenClaw instance"
   value = {
     for name, instance in aws_instance.openclaw : name => {
-      instance_id = instance.id
-      public_ip   = instance.public_ip
-      ssh_command = instance.public_ip != null ? "ssh ec2-user@${instance.public_ip}" : null
-      ssm_command = "aws ssm start-session --target ${instance.id} --region ${var.aws_region}"
+      instance_id    = instance.id
+      public_ip      = instance.public_ip
+      data_volume_id = aws_ebs_volume.openclaw_data[name].id
+      ssh_command    = instance.public_ip != null ? "ssh ec2-user@${instance.public_ip}" : null
+      ssm_command    = "aws ssm start-session --target ${instance.id} --region ${var.aws_region}"
     }
   }
 }

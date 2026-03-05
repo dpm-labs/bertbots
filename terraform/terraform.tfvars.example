@@ -27,6 +27,9 @@ secrets = {
 # workspace_repo_path  = "workspace"            # subdirectory within repo (optional)
 # workspace_repo_token = "ghp_your-token-here"  # required for private repos
 
+# Optional: persistent data volume size (default 10 GB)
+# data_volume_size = 10
+
 # Optional: SSH access
 # ssh_public_key    = "ssh-ed25519 AAAA..."
 # ssh_allowed_cidrs = ["1.2.3.4/32"]
